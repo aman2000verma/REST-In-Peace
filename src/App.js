@@ -11,7 +11,12 @@ import {
   Box,
   Typography,
   Accordion,
-  AccordionSummary
+  AccordionSummary,
+  Dialog,
+  DialogTitle,
+  DialogContentText,
+  DialogContent,
+  DialogActions
 } from "@mui/material";
 import AccordionDetails from "@mui/material/AccordionDetails";
 import SendIcon from "@mui/icons-material/Send";
@@ -22,6 +27,8 @@ import Badge from "@mui/material/Badge";
 import React from "react";
 import Request from "./Request";
 import HeadersTable from "./HeadersTable";
+import Sidebar from "./Sidebar";
+import SaveIcon from "@mui/icons-material/Save";
 
 const reqTypes = ["GET", "POST", "DELETE", "PUT", "PATCH"];
 // const combinations = [{ "[": "]" }, { "{": "}" }, { "(": ")" }];
@@ -52,7 +59,6 @@ function App() {
     setHeaders([...headers, { key: "", value: "" }]);
   };
   const handleDeleteHeader = (ndx) => {
-    console.log();
     let temp = [...headers.slice(0, ndx), ...headers.slice(ndx + 1)];
     setHeaders(temp);
   };
@@ -73,28 +79,26 @@ function App() {
 
   const [result, setResult] = React.useState("");
   const resRef = React.useRef(null);
-  const sendRequest = () => {
+  const sendRequest = async () => {
     let payload = {};
     headers.forEach((h) => {
       if (h.key !== "" && h.value !== "") payload[h.key] = h.value;
     });
-
-    // console.log(reqType, url, headers, body);
     switch (reqType) {
       case "GET":
-        Request.GET(url, headers, body, setResult);
+        await Request.GET(url, headers, body, setResult);
         break;
       case "POST":
-        Request.POST(url, headers, body, setResult);
+        await Request.POST(url, headers, body, setResult);
         break;
       case "DELETE":
-        Request.DELETE(url, headers, body, setResult);
+        await Request.DELETE(url, headers, body, setResult);
         break;
       case "PUT":
-        Request.PUT(url, headers, body, setResult);
+        await Request.PUT(url, headers, body, setResult);
         break;
       case "PATCH":
-        Request.PATCH(url, headers, body, setResult);
+        await Request.PATCH(url, headers, body, setResult);
         break;
       default:
         console.error("Invalid Request!");
@@ -103,6 +107,46 @@ function App() {
     resRef.current.scrollIntoView({ behavior: "smooth" });
   };
 
+  const [open, setOpen] = React.useState(false);
+  const [savedReq, setSavedReq] = React.useState([]);
+  const getSavedRequests = () => {
+    let saved = localStorage.getItem("savedReq");
+    if (saved) {
+      setSavedReq(JSON.parse(saved));
+    }
+  };
+  const [reqName, setReqName] = React.useState("");
+  const [saveDialog, setSaveDialog] = React.useState(false);
+  const deleteSavedRequest = (ndx) => {
+    let temp = [...savedReq.slice(0, ndx), ...savedReq.slice(ndx + 1)];
+    setSavedReq(temp);
+    localStorage.setItem("savedReq", JSON.stringify(temp));
+  };
+  const loadSavedRequest = (ndx) => {
+    const req = savedReq[ndx];
+    setReqType(req.type);
+    setBody(req.body);
+    setUrl(req.url);
+    setHeaders(req.headers);
+  };
+  const saveRequest = () => {
+    const req = {
+      name: reqName,
+      type: reqType,
+      url: url,
+      body: body,
+      headers: headers
+    };
+    //Append this to existing requests
+    const temp = [...savedReq, req];
+    localStorage.setItem("savedReq", JSON.stringify(temp));
+    setSavedReq(temp);
+  };
+
+  React.useEffect(() => {
+    getSavedRequests();
+  }, []);
+
   return (
     <div className="App">
       <Box
@@ -110,14 +154,13 @@ function App() {
         fullWidth
         sx={{ backgroundColor: "#1769aa", color: "white" }}
       >
-        <Typography
-          textAlign={"center"}
-          py={2}
-          fontSize={"xx-large"}
-          fontFamily={"fantasy"}
-        >
-          R.E.S.T. In Peace
-        </Typography>
+        <Sidebar
+          open={open}
+          setOpen={setOpen}
+          data={savedReq}
+          loadReq={loadSavedRequest}
+          deleteReq={deleteSavedRequest}
+        />
       </Box>
       <Container>
         <Grid columns={10} my={2} container spacing={2} justifyContent="left">
@@ -138,8 +181,8 @@ function App() {
               placeholder="URL"
               fullWidth
               value={url}
-              onChange={handleUrl}
-              onKeyUp={handleUrl}
+              onChange={(e) => handleUrl(e)}
+              onKeyUp={(e) => handleUrl(e)}
               spellCheck="false"
               InputProps={{ style: { fontFamily: "consolas" } }}
             />
@@ -193,7 +236,7 @@ function App() {
               Send
             </Button>
           </Grid>
-          <Grid ref={resRef} item xs={10} hidden={result.length === 0}>
+          <Grid item xs={10} hidden={result.length === 0}>
             <TextField
               multiline
               fullWidth
@@ -205,8 +248,45 @@ function App() {
               InputProps={{ style: { fontFamily: "consolas" } }}
             />
           </Grid>
+          <Grid ref={resRef} item xs={10} hidden={result.length === 0}>
+            <Button
+              variant="contained"
+              onClick={() => setSaveDialog(true)}
+              endIcon={<SaveIcon />}
+            >
+              Save
+            </Button>
+          </Grid>
         </Grid>
       </Container>
+      <Dialog open={saveDialog} onClose={() => setSaveDialog(false)}>
+        <DialogTitle>Save Request</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Please name the request to store the request locally.
+          </DialogContentText>
+          <TextField
+            autoFocus
+            type="text"
+            fullWidth
+            variant="standard"
+            placeholder="Request Name"
+            onChange={(e) => setReqName(e.target.value)}
+            onKeyUp={(e) => setReqName(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSaveDialog(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              saveRequest();
+              setSaveDialog(false);
+            }}
+          >
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 }
